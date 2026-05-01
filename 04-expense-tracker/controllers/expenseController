@@ -1,0 +1,119 @@
+const prisma = require("../lib/db");
+
+const createExpense = async (req, res) => {
+  const { amount, category, date, description } = req.body;
+  if (!amount || !category || !date || !description) {
+    res.status(400);
+    throw new Error("All fields are mandatory");
+  }
+
+  const expense = await prisma.expense.create({
+    data: { amount, category, description, date },
+  });
+  res.status(201).json(expense);
+};
+const getAllExpenses = async (req, res) => {
+  let duration = req.query.duration;
+  let expense;
+  if (duration === "weekly") {
+    expense = await prisma.expense.findMany({
+      where: {
+        createdAt: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        },
+      },
+    });
+  }
+
+  if (duration === "monthly") {
+    expense = await prisma.expense.findMany({
+      where: {
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 24 * 3600 * 1000),
+        },
+      },
+    });
+  }
+  if (duration === "ninetyDays") {
+    expense = await prisma.expense.findMany({
+      where: {
+        createdAt: {
+          gte: new Date(Date.now() * 90 * 24 * 3600 * 1000),
+        },
+      },
+    });
+  }
+  if (duration === "custom") {
+    const startDate = new Date(req.query.startDate);
+    const endDate = new Date(req.query.endDate);
+
+    expense = await prisma.expense.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+  }
+  if (!expense) {
+    res.status(400);
+    throw new Error("No Expenses Found");
+  }
+
+  res.status(200).json(expense);
+};
+
+const getSingleExpense = async (req, res) => {
+  const id = parseInt(req.params.id);
+  const expense = await prisma.expense.findFirst({
+    where: { id, userId: req.user.id },
+  });
+  if (!expense) {
+    res.status(400);
+    throw new Error("No Expense Found");
+  }
+  res.status(200).json(expense);
+};
+
+const updateExpense = async (req, res) => {
+  const { amount, category, description, date } = req.body;
+  const id = parseInt(req.params.id);
+  const expense = await prisma.expense.findFirst({
+    where: { id, userId: req.user.id },
+  });
+  if (!expense) {
+    res.status(400);
+    throw new Error("No Expense Found");
+  }
+
+  await prisma.expense.update({
+    where: { id, data: { amount, category, description, date } },
+  });
+  res.status(200).json({ message: "expense updated!" });
+};
+
+const deleteExpense = async (req, res) => {
+  const id = parseInt(req.params.id);
+  const expense = await prisma.expense.findFirst({
+    where: { id, userId: req.user.id },
+  });
+  if (!expense) {
+    res.status(400);
+    throw new Error("No Expense Found");
+  }
+  await prisma.expense.delete({
+    where: {
+      id,
+    },
+  });
+  res.status(200).json({ message: "expense deleted successfully" });
+};
+
+module.exports = {
+  getAllExpenses,
+  createExpense,
+  getSingleExpense,
+  deleteExpense,
+  updateExpense,
+};
